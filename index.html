@@ -167,19 +167,29 @@
     updateClock();
   }
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      setupSunTimes(pos.coords.latitude, pos.coords.longitude);
-    }, () => {
-      console.warn("No location → default night mode");
-      document.body.style.background = "black";
-      document.body.style.color = "white";
-    });
-  } else {
-    console.warn("Geolocation not supported → default night mode");
-    document.body.style.background = "black";
-    document.body.style.color = "white";
+  // --- IP-based location lookup ---
+  async function getLocationFromIP() {
+    try {
+      const response = await fetch("http://ip-api.com/json");
+      const data = await response.json();
+      if (data.status === "success") {
+        console.log("Location from IP:", data.city, data.lat, data.lon);
+        setupSunTimes(data.lat, data.lon);
+      } else {
+        console.error("IP lookup failed:", data.message);
+        // Default to a known location if lookup fails
+        setupSunTimes(34.0522, -118.2437); // Los Angeles, as a fallback
+      }
+    } catch (error) {
+      console.error("Error fetching IP location:", error);
+      // Default to a known location if fetch fails
+      setupSunTimes(34.0522, -118.2437); // Los Angeles, as a fallback
+    }
   }
+
+  // Use the IP-based lookup instead of geolocation
+  getLocationFromIP();
+
 
   // Adjust when window resizes
   window.addEventListener("resize", () => {
