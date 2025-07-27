@@ -19,7 +19,7 @@
     position: absolute;
     text-align: center;
     white-space: nowrap;
-    /* Smooth fade for text opacity too */
+    /* Smooth fade for text opacity */
     transition: opacity 1s ease;
   }
   #time {
@@ -125,7 +125,7 @@
           }
           // Fade text back in after background change
           clock.style.opacity = "1";
-        }, 500); // Halfway through the transition
+        }, 500); // halfway through the transition
       }
     }
   }
@@ -155,7 +155,24 @@
 
   bounce();
 
-  // Detect location ONCE and calculate sunrise/sunset
+  // Detect approximate location via IP lookup (no permission needed)
+  function fetchApproxLocation() {
+    fetch("https://ipapi.co/json/")
+      .then(response => response.json())
+      .then(data => {
+        console.log("Approx location:", data.city, data.region, data.country_name);
+        console.log("Lat:", data.latitude, "Lon:", data.longitude);
+
+        setupSunTimes(data.latitude, data.longitude);
+      })
+      .catch(err => {
+        console.warn("Could not get IP location → default night mode");
+        document.body.style.background = "black";
+        document.body.style.color = "white";
+      });
+  }
+
+  // Calculate sunrise/sunset once
   function setupSunTimes(lat, lon) {
     const today = new Date();
     const sunTimes = getSunTimes(today, lat, lon);
@@ -163,33 +180,11 @@
     sunset = sunTimes.sunset;
     console.log("Sunrise:", sunrise, "Sunset:", sunset);
 
-    // Force an initial check so background is correct right away
-    updateClock();
+    updateClock(); // Apply immediately
   }
 
-  // --- IP-based location lookup ---
-  async function getLocationFromIP() {
-    try {
-      const response = await fetch("http://ip-api.com/json");
-      const data = await response.json();
-      if (data.status === "success") {
-        console.log("Location from IP:", data.city, data.lat, data.lon);
-        setupSunTimes(data.lat, data.lon);
-      } else {
-        console.error("IP lookup failed:", data.message);
-        // Default to a known location if lookup fails
-        setupSunTimes(34.0522, -118.2437); // Los Angeles, as a fallback
-      }
-    } catch (error) {
-      console.error("Error fetching IP location:", error);
-      // Default to a known location if fetch fails
-      setupSunTimes(34.0522, -118.2437); // Los Angeles, as a fallback
-    }
-  }
-
-  // Use the IP-based lookup instead of geolocation
-  getLocationFromIP();
-
+  // Get IP-based location instead of asking for permission
+  fetchApproxLocation();
 
   // Adjust when window resizes
   window.addEventListener("resize", () => {
