@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bouncing Clock Screensaver</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background: black;
+    color: white;
+    transition: background 1s ease, color 1s ease;
+  }
+
+  #clock {
+    position: absolute;
+    text-align: center;
+    white-space: nowrap;
+    will-change: transform; /* GPU accelerate */
+    transition: opacity 1s ease;
+  }
+
+  #time {
+    font-size: 4em;
+    font-weight: bold;
+  }
+
+  #date {
+    font-size: 1.5em;
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+
+<div id="clock">
+  <div id="time"></div>
+  <div id="date"></div>
+</div>
+
+<script>
+  const clock = document.getElementById("clock");
+  const timeElem = document.getElementById("time");
+  const dateElem = document.getElementById("date");
+
+  let sunrise = null;
+  let sunset = null;
+  let currentMode = null; 
+
+  // === CLOCK UPDATE ===
+  function updateClock() {
+    const now = new Date();
+
+    const time = now.toLocaleTimeString('en-US', { hour12: true });
+    const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const dateString = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    timeElem.textContent = time;
+    dateElem.textContent = `${day}, ${dateString}`;
+
+    if (sunrise && sunset) {
+      let newMode = (now >= sunrise && now < sunset) ? "day" : "night";
+
+      if (newMode !== currentMode) {
+        currentMode = newMode;
+        clock.style.opacity = "0"; // fade out text
+
+        setTimeout(() => {
+          if (newMode === "day") {
+            document.body.style.background = "white";
+            document.body.style.color = "black";
+          } else {
+            document.body.style.background = "black";
+            document.body.style.color = "white";
+          }
+          clock.style.opacity = "1"; // fade in after switch
+        }, 500);
+      }
+    }
+  }
+
+  // Update once a second (low load)
+  setInterval(updateClock, 1000);
+
+  // === BOUNCE === (optimized with transform)
+  let x = 100, y = 100;
+  let dx = 1.2, dy = 1.2; // slower movement for smoother feel
+
+  function bounce() {
+    const rect = clock.getBoundingClientRect();
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    x += dx;
+    y += dy;
+
+    if (x + rect.width >= width || x <= 0) dx = -dx;
+    if (y + rect.height >= height || y <= 0) dy = -dy;
+
+    // GPU-friendly move
+    clock.style.transform = `translate(${x}px, ${y}px)`;
+
+    requestAnimationFrame(bounce);
+  }
+
+  bounce();
+
+  // === SUNRISE/SUNSET FETCH ===
+  function utcToLocalDate(utcString) {
+    return new Date(utcString);
+  }
+
+  function fetchSunriseSunset(lat, lon) {
+    const url = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "OK") {
+          sunrise = utcToLocalDate(data.results.sunrise);
+          sunset  = utcToLocalDate(data.results.sunset);
+          console.log("Sunrise:", sunrise, "Sunset:", sunset);
+          updateClock(); // apply immediately
+        }
+      })
+      .catch(err => {
+        console.warn("Could not fetch sunrise/sunset", err);
+      });
+  }
+
+  function fetchApproxLocation() {
+    fetch("https://ipapi.co/json/")
+      .then(response => response.json())
+      .then(data => {
+        console.log("Approx location:", data.city, data.region, data.country_name);
+        fetchSunriseSunset(data.latitude, data.longitude);
+      })
+      .catch(err => {
+        console.warn("Could not get IP location");
+      });
+  }
+
+  fetchApproxLocation();
+
+  window.addEventListener("resize", () => {
+    // keep inside screen
+    x = Math.min(x, window.innerWidth - clock.offsetWidth);
+    y = Math.min(y, window.innerHeight - clock.offsetHeight);
+  });
+</script>
+
+</body>
+</html>
